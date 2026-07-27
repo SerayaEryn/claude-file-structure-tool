@@ -1,4 +1,4 @@
-# File Structure
+# Claude File Structure Tool
 
 [![Tests](https://github.com/SerayaEryn/claude-file-structure-tool/actions/workflows/tests.yml/badge.svg)](https://github.com/SerayaEryn/claude-file-structure-tool/actions/workflows/tests.yml)
 
