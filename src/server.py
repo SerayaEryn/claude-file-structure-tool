@@ -1,10 +1,10 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
-#   "mcp",
-#   "tree-sitter",
-#   "tree-sitter-language-pack",
-#   "pathspec",
+#   "mcp>=1.28",
+#   "tree-sitter>=0.26",
+#   "tree-sitter-language-pack>=1.13",
+#   "pathspec>=1.1",
 # ]
 # ///
 import os

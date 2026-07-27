@@ -1,5 +1,5 @@
 # /// script
-# dependencies = ["pathspec"]
+# dependencies = ["pathspec>=1.1"]
 # ///
 import os
 from pathlib import Path

@@ -1,5 +1,7 @@
 # File Structure
 
+[![Tests](https://github.com/SerayaEryn/claude-file-structure-tool/actions/workflows/tests.yml/badge.svg)](https://github.com/SerayaEryn/claude-file-structure-tool/actions/workflows/tests.yml)
+
 A Claude Code plugin exposing a `file_structure` MCP tool: a deterministic
 structural skeleton (imports + every declaration with its real signature and
 line number) for source files. Read a file's shape before opening it.
@@ -9,21 +11,14 @@ hallucination. Unsupported extensions fall back to raw content.
 
 ## Install
 
-Requires [`uv`](https://docs.astral.sh/uv/) on `PATH`.
+Requires [`uv`](https://docs.astral.sh/uv/) on `PATH` — it transparently
+installs the plugin's Python dependencies (Python 3.10+) on first run, no
+separate setup needed.
 
 ```
 /plugin marketplace add SerayaEryn/claude-file-structure-tool
 /plugin install file-structure@file-structure
 ```
-
-## Tool
-
-`file_structure(files: string[], hide_private: bool = false) -> string`
-
-- `files` — paths to digest.
-- `hide_private` — omit private/underscore-prefixed declarations.
-
-Paths matched by `.gitignore`/`.aiignore` are refused.
 
 ## Supported languages
 
@@ -40,6 +35,33 @@ Paths matched by `.gitignore`/`.aiignore` are refused.
 | `.go`                            | Go         |
 | `.groovy`, `.gradle`             | Groovy     |
 | `.md`, `.markdown`               | Markdown   |
+
+## Tool
+
+`file_structure(files: string[], hide_private: bool = false) -> string`
+
+- `files` — paths to digest.
+- `hide_private` — omit private/underscore-prefixed declarations.
+
+Paths matched by `.gitignore`/`.aiignore` are refused.
+
+## Example
+
+`file_structure(["src/ignore_filter.py"])` returns:
+
+```
+===== src/ignore_filter.py =====
+imports: from pathspec import GitIgnoreSpec
+L12: def _read_lines(path)
+L20: class IgnoreMatcher
+  L24: def __init__(self, root)
+  L28: def _spec_for_dir(self, dir_path)
+  L46: def is_ignored(self, rel_path_str, is_dir=False)
+L68: def get_matcher(root)
+L77: def _is_noise(root, rel_path_str, is_dir=False)
+L81: def _find_repo_root(path)
+L93: def _is_ignored(path)
+```
 
 ## License
 

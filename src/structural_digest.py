@@ -1,7 +1,7 @@
 # /// script
 # dependencies = [
-#   "tree-sitter",
-#   "tree-sitter-language-pack",
+#   "tree-sitter>=0.26",
+#   "tree-sitter-language-pack>=1.13",
 # ]
 # ///
 import re
