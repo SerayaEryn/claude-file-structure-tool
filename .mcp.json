@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "file-structure": {
+      "command": "uv",
+      "args": ["run", "--quiet", "--script", "${CLAUDE_PLUGIN_ROOT}/server/server.py"]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "file-structure",
+  "owner": {
+    "name": "Denis Fäcke"
+  },
+  "plugins": [
+    {
+      "name": "file-structure",
+      "source": "./",
+      "description": "Deterministic tree-sitter skeleton (imports + declarations with signatures and line numbers) for source files, exposed as an MCP tool.",
+      "version": "0.1.0"
+    }
+  ]
+}
