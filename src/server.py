@@ -45,15 +45,19 @@ def _digest_or_raw(path, hide_private=False):
 @mcp.tool()
 def file_structure(files: list[str], hide_private: bool = False) -> str:
     """Compact structural skeleton of one or more source files: imports plus every
-    type/function/field declaration with its exact signature and line number, sliced
+    type/function/field declaration with its exact signature and line span, sliced
     verbatim from source.
 
     Reach for this FIRST, before Read, whenever you need a file's SHAPE rather than
     its full contents:
     - "where/what is X defined here" - locating a function/class/field to edit
-    - getting line numbers to aim a precise Read or Edit
+    - getting a line span to aim a precise Read or Edit
     - surveying a file's public API or overall layout
     - scanning several files at once: pass many paths in ONE call
+
+    Each declaration is tagged `L{start}-{end}` (or `L{n}` when it's a single
+    line) covering its full body, not just its header - feed that span straight
+    into Read(offset=start, limit=end-start+1) instead of reading the whole file.
 
     Fall back to Read only when you need the actual body of a specific declaration or
     non-declaration content. Falls back to raw file text for unsupported extensions or

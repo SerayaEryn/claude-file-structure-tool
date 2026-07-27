@@ -28,6 +28,15 @@ def _node_text(node, content):
     return content[node.start_byte:node.end_byte].decode("utf-8", "ignore")
 
 
+def _lineref(node):
+    # Emits a start-end span so a caller can feed it straight into a
+    # targeted Read(offset, limit) instead of reading the whole file.
+    # Collapsed to a single line number when start == end.
+    s = node.start_point[0] + 1
+    e = node.end_point[0] + 1
+    return f"L{s}" if s == e else f"L{s}-{e}"
+
+
 def _find_body(node, spec):
     body_field = spec.get("body_field")
     if body_field:
@@ -131,7 +140,7 @@ def _arrow_const_sigs(node, content, spec, indent):
         end = fn_body.start_byte if fn_body is not None else declarator.end_byte
         raw_text = content[node.start_byte:end].decode("utf-8", "ignore")
         sig = _normalize_sig(raw_text, spec)
-        out.append(f"{indent}L{declarator.start_point[0] + 1}: {sig}")
+        out.append(f"{indent}{_lineref(declarator)}: {sig}")
     return out
 
 
@@ -147,7 +156,7 @@ def _walk(container, spec, content, depth, hide_private=False):
             out.extend(_walk(child, spec, content, depth, hide_private))
         elif t in spec["type_nodes"]:
             sig = _extract_sig(child, content, spec)
-            out.append(f"{indent}L{child.start_point[0] + 1}: {sig}")
+            out.append(f"{indent}{_lineref(child)}: {sig}")
             body = _find_body(child, spec)
             if body is not None:
                 out.extend(_walk(body, spec, content, depth + 1, hide_private))
@@ -155,12 +164,12 @@ def _walk(container, spec, content, depth, hide_private=False):
             sig = _extract_sig(child, content, spec)
             if hide_private and _is_private(sig, spec):
                 continue
-            out.append(f"{indent}L{child.start_point[0] + 1}: {sig}")
+            out.append(f"{indent}{_lineref(child)}: {sig}")
         elif t in spec.get("field_nodes", ()):
             sig = _extract_sig(child, content, spec)
             if hide_private and _is_private(sig, spec):
                 continue
-            out.append(f"{indent}L{child.start_point[0] + 1}: field: {sig}")
+            out.append(f"{indent}{_lineref(child)}: field: {sig}")
         elif spec.get("arrow_const") and t in ("lexical_declaration", "variable_declaration"):
             out.extend(_arrow_const_sigs(child, content, spec, indent))
         if len(out) >= MAX_DIGEST_LINES:
@@ -312,22 +321,22 @@ def _walk_groovy_class(container, spec, content, depth, in_method_body):
         # commands as declarations at class-body (or file-root) level.
         if block is not None and not in_method_body:
             sig = _extract_sig(child, content, spec)
-            out.append(f"{indent}L{child.start_point[0] + 1}: {sig}")
+            out.append(f"{indent}{_lineref(child)}: {sig}")
             is_class = bool(_GROOVY_CLASS_KEYWORDS.search(_groovy_header_text(child, content)))
             out.extend(_walk_groovy_class(block, spec, content, depth + 1, not is_class))
             pending_where = False
         elif in_method_body:
             label = _spock_label_text(child, content)
             if label is not None:
-                out.append(f"{indent}L{child.start_point[0] + 1}: {label}")
+                out.append(f"{indent}{_lineref(child)}: {label}")
                 pending_where = label.startswith("where")
             elif pending_where:
                 sig = _collapse_sig(_node_text(child, content))
-                out.append(f"{indent}L{child.start_point[0] + 1}: {sig}")
+                out.append(f"{indent}{_lineref(child)}: {sig}")
                 pending_where = False
         else:
             sig = _extract_sig(child, content, spec)
-            out.append(f"{indent}L{child.start_point[0] + 1}: {sig}")
+            out.append(f"{indent}{_lineref(child)}: {sig}")
         if len(out) >= MAX_DIGEST_LINES:
             out.append(f"{indent}... [truncated, digest line cap reached]")
             break

@@ -52,16 +52,20 @@ Paths matched by `.gitignore`/`.aiignore` are refused.
 ```
 ===== src/ignore_filter.py =====
 imports: from pathspec import GitIgnoreSpec
-L12: def _read_lines(path)
-L20: class IgnoreMatcher
-  L24: def __init__(self, root)
-  L28: def _spec_for_dir(self, dir_path)
-  L46: def is_ignored(self, rel_path_str, is_dir=False)
-L68: def get_matcher(root)
-L77: def _is_noise(root, rel_path_str, is_dir=False)
-L81: def _find_repo_root(path)
-L93: def _is_ignored(path)
+L12-17: def _read_lines(path)
+L20-62: class IgnoreMatcher
+  L24-26: def __init__(self, root)
+  L28-44: def _spec_for_dir(self, dir_path)
+  L46-62: def is_ignored(self, rel_path_str, is_dir=False)
+L68-74: def get_matcher(root)
+L77-78: def _is_noise(root, rel_path_str, is_dir=False)
+L81-90: def _find_repo_root(path)
+L93-96: def _is_ignored(path)
 ```
+
+Each declaration's `L{start}-{end}` span covers its full body (single-line
+declarations collapse to `L{n}`) — feed it straight into a targeted
+`Read(offset, limit)` instead of reading the whole file.
 
 ## License
 
