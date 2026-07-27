@@ -1,12 +1,7 @@
-"""Language registry: file-extension routing and per-language tree-sitter
-node-type configuration for structural_digest.py.
-
-Node type names are best-effort against current tree-sitter grammars for
-each language. If a name is wrong or a grammar changes, the affected
-declarations are simply never matched - build_digest() then returns None
-(no declarations found) and the caller falls back to the LLM path. Wrong
-names degrade gracefully, they never crash the hook.
-"""
+# Node type names are best-effort against current tree-sitter grammars. If a
+# name is wrong or a grammar changes, the affected declarations are simply
+# never matched - build_digest() then returns None and the caller falls back,
+# rather than crashing.
 
 LANG_BY_EXT = {
     ".java": "java",

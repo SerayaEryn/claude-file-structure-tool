@@ -1,6 +1,3 @@
-"""build_digest's fallback-to-None paths: unsupported language, a parseable
-but declaration-free source, and markdown with no headings. Also covers
-LANG_BY_EXT extension routing."""
 from specs import LANG_BY_EXT
 from structural_digest import build_digest
 

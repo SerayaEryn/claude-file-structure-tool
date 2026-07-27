@@ -7,13 +7,6 @@
 #   "pathspec",
 # ]
 # ///
-"""MCP server: exposes a `file_structure` tool that prints an exact
-structural skeleton for one or more source files.
-
-Deterministic tree-sitter extraction via structural_digest.py - no LLM, no
-hallucination risk. Falls back to raw file content when the extension isn't
-supported or no declarations are found.
-"""
 import os
 import sys
 
@@ -28,7 +21,6 @@ mcp = FastMCP("file-structure")
 
 
 def _digest_or_raw(path, hide_private=False):
-    """Returns (text, ok). ok is False only when the file can't be read."""
     try:
         with open(path, "rb") as f:
             data = f.read()

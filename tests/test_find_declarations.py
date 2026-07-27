@@ -1,6 +1,3 @@
-"""Name -> line-number lookups via find_declarations, including the
-multi-declarator field case (_decl_names) fixed for Java/C#, and the
-struct-field name case shared by Go/Rust."""
 from structural_digest import find_declarations
 from test_languages import CSHARP_SRC, GO_SRC, JAVA_SRC, RUST_SRC
 

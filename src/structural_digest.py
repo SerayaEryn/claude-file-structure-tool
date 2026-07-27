@@ -4,20 +4,6 @@
 #   "tree-sitter-language-pack",
 # ]
 # ///
-"""Deterministic structural digest via tree-sitter.
-
-Builds an exact (no hallucination) skeleton of a source file: top-level
-package/imports, then every type/function/field declaration in source
-order with its exact signature (sliced straight from the source bytes,
-never re-synthesized) and its real line number. Used by file_structure.py
-as the deterministic extractor, falling back to the LLM digest in
-file_summary.py for languages/files this can't handle.
-
-Returns None (never raises past build_digest) whenever it can't produce a
-useful digest, so the caller can fall back safely: unsupported extension,
-parser unavailable, or zero declarations found (e.g. a config/script file
-that happens to share an extension we don't otherwise expect).
-"""
 import re
 import sys
 
@@ -30,9 +16,6 @@ _parsers = {}
 
 
 def _get_parser(lang):
-    """Lazily import tree_sitter_language_pack and cache one parser per
-    language - the import itself is what's allowed to fail (missing dep),
-    everything after is on us."""
     if lang in _parsers:
         return _parsers[lang]
     from tree_sitter_language_pack import get_parser
@@ -46,9 +29,6 @@ def _node_text(node, content):
 
 
 def _find_body(node, spec):
-    """Locate a declaration's body node. Prefers the grammar's field name
-    (Java, Python); falls back to matching child node types by name for
-    grammars that don't expose fields (Kotlin)."""
     body_field = spec.get("body_field")
     if body_field:
         body = node.child_by_field_name(body_field)
@@ -63,10 +43,9 @@ def _find_body(node, spec):
 
 
 def _first_brace_start(node):
-    """Byte offset of the first literal '{' in node's subtree, in document
-    order (tree-sitter children are always position-ordered, so pre-order
-    DFS visits nodes in increasing start_byte order and the first hit is
-    the earliest '{' overall). Returns early without descending past it."""
+    # tree-sitter children are always position-ordered, so pre-order DFS
+    # visits nodes in increasing start_byte order and the first hit here is
+    # the earliest '{' overall.
     for child in node.children:
         if child.type == "{":
             return child.start_byte
@@ -77,10 +56,6 @@ def _first_brace_start(node):
 
 
 def _normalize_sig(raw_text, spec):
-    """Collapse a raw source slice into a single-line signature: strip a
-    trailing standalone comment line, collapse whitespace, drop a trailing
-    opener/terminator, cap length. Shared by _extract_sig and the arrow-const
-    extractor so both signatures are formatted identically."""
     marker = spec.get("comment_marker")
     if marker:
         # A standalone comment line preceding the body's first real
@@ -100,10 +75,6 @@ def _normalize_sig(raw_text, spec):
 
 
 def _extract_sig(node, content, spec):
-    """Exact source text of a declaration up to (not including) its body -
-    e.g. 'public class Foo<T> extends Bar implements Baz' or 'Order
-    place(CustomerId id, Cart cart) throws PaymentError'. Sliced straight
-    from source bytes, never reconstructed, so it can't hallucinate."""
     body = _find_body(node, spec)
     if body is not None and spec.get("header_via_brace_scan"):
         # Groovy's `block` node can wrap part of the declaration's own
@@ -121,9 +92,6 @@ def _extract_sig(node, content, spec):
 
 
 def _is_private(sig, spec):
-    """Whether an already-extracted signature reads as private, per the
-    language's private_marker. Text-based (no structured visibility info is
-    ever attached to a node) - see 'private_marker' in SPECS."""
     marker = spec.get("private_marker")
     if marker == "keyword":
         return sig.startswith("#") or re.search(r"\bprivate\b", sig) is not None
@@ -152,11 +120,6 @@ _ARROW_CONST_VALUE_TYPES = {"arrow_function", "function_expression", "function"}
 
 
 def _arrow_const_sigs(node, content, spec, indent):
-    """`const Foo = (...) => {...}` / `const f = function () {}` declarations
-    aren't covered by the class/function/interface node model above, but are
-    ubiquitous in TS/React. Emit one line per declarator whose initializer is
-    a function-like expression, sliced up to the function body (or the full
-    declarator if there's no body, e.g. an overload-only arrow type)."""
     out = []
     for declarator in node.children:
         if declarator.type != "variable_declarator":
@@ -214,13 +177,8 @@ def _first_child_of_type(node, types):
 
 
 def _decl_names(node, content, lang):
-    """Identifier(s) declared by a definition node - almost always one, but a
-    Java/C# field_declaration can carry several comma-separated declarators
-    (e.g. 'int x, y;'). Kotlin's grammar exposes no field names at all (see
-    SPECS["kotlin"]'s body_field comment), so its nodes are matched by child
-    type instead of child_by_field_name. Go and Rust also use the node type
-    `field_declaration` for struct fields, but unlike Java/C# expose a plain
-    single `name` field - they fall through to the generic case below."""
+    # Kotlin's grammar exposes no field names at all (see SPECS["kotlin"]'s
+    # body_field comment) - matched by child type instead of field name.
     if lang == "kotlin":
         if node.type == "property_declaration":
             decl = _first_child_of_type(node, {"variable_declaration"})
@@ -251,11 +209,8 @@ def _decl_names(node, content, lang):
 
 
 def _iter_decls(container, spec, lang, content):
-    """Yields (name, line1based) for every declaration under `container` -
-    the same node kinds _walk emits signatures for, but resolving each one's
-    declared identifier instead of its full signature text. Used by
-    find_declarations; kept separate from _walk (rather than shared) so this
-    addition can't affect build_digest's existing, heavily-tested output."""
+    # Kept separate from _walk (rather than shared) so this can't affect
+    # build_digest's existing, heavily-tested output.
     for child in container.children:
         t = child.type
         if t in spec.get("unwrap_nodes", ()):
@@ -282,11 +237,6 @@ def _iter_decls(container, spec, lang, content):
 
 
 def find_declarations(content, lang, name):
-    """1-based start lines of every declaration named `name` in this file, via
-    the same tree-sitter parse _walk uses - exact, no comment/string false
-    positives. Returns None if `lang` has no named-declaration model to query
-    (unsupported extension, Groovy's shallow block-outline grammar, Markdown),
-    else a (possibly empty) list of line numbers."""
     if lang in ("markdown", "groovy"):
         return None
     spec = SPECS.get(lang)
@@ -307,17 +257,12 @@ _SPOCK_LABELS = {
 
 
 def _groovy_header_text(node, content):
-    """Raw source text of a groovy `command` up to its first '{' - the part
-    before the block body - used to sniff class/method headers for keywords."""
     brace = _first_brace_start(node)
     end = brace if brace is not None else node.end_byte
     return content[node.start_byte:end].decode("utf-8", "ignore")
 
 
 def _groovy_is_class_file(root, content, spec):
-    """True if this Groovy file declares a top-level class/interface/enum/
-    trait (a Spock spec or ordinary class) rather than a Gradle build script
-    (no such declaration - every statement is a bare DSL command)."""
     for child in root.children:
         if child.type != "command":
             continue
@@ -330,9 +275,9 @@ def _groovy_is_class_file(root, content, spec):
 
 
 def _collapse_sig(text):
-    """Whitespace-collapse and length-cap, without _normalize_sig's trailing
-    opener/terminator strip - used for Spock labels and where-table rows,
-    which legitimately end in ':' or a data value we don't want truncated."""
+    # Unlike _normalize_sig, doesn't strip a trailing opener/terminator -
+    # Spock labels and where-table rows legitimately end in ':' or a data
+    # value that shouldn't be truncated.
     raw = " ".join(text.split())
     if len(raw) > MAX_SIG_LEN:
         raw = raw[:MAX_SIG_LEN].rstrip() + "…"
@@ -340,10 +285,6 @@ def _collapse_sig(text):
 
 
 def _spock_label_text(node, content):
-    """If `node` is a Spock block-label command - `given:`, `when: "desc"` -
-    return its source text (label plus optional description), else None.
-    Detected by the first child being one of Spock's block keywords followed
-    directly by an `arg_spliter` ':' child."""
     children = node.children
     if len(children) < 2:
         return None
@@ -356,13 +297,6 @@ def _spock_label_text(node, content):
 
 
 def _walk_groovy_class(container, spec, content, depth, in_method_body):
-    """Class-aware Groovy walk, used instead of `_walk` when the file
-    declares a top-level class (Spock spec or ordinary class) rather than
-    being a Gradle DSL script. Emits a Java-style skeleton - class, fields,
-    method signatures - and, inside method bodies, keeps only Spock block
-    labels (given/when/then/.../where) plus the first row of a where: data
-    table. Ordinary statements are dropped so a test's assertions/setup
-    don't dump the whole method body into the digest."""
     out = []
     indent = "  " * depth
     pending_where = False
@@ -391,7 +325,6 @@ def _walk_groovy_class(container, spec, content, depth, in_method_body):
                 sig = _collapse_sig(_node_text(child, content))
                 out.append(f"{indent}L{child.start_point[0] + 1}: {sig}")
                 pending_where = False
-            # else: ordinary statement inside a method body - dropped.
         else:
             sig = _extract_sig(child, content, spec)
             out.append(f"{indent}L{child.start_point[0] + 1}: {sig}")
@@ -411,9 +344,6 @@ def _format_header(prefix, pkg, all_imports, notable):
 
 
 def _format_import_list(all_imports, notable, shorten=True):
-    """'a, b (+2 more)' if there are notable (non-stdlib/common) imports,
-    else a terse stdlib-only count - never a confusing '(+N more)' tacked
-    onto an empty/generic list."""
     shown = notable[:5]
     if not shown:
         common = len(all_imports)
@@ -599,9 +529,6 @@ _HEADER_BUILDERS = {
 
 
 def _import_nodes(root, lang):
-    """Import-statement nodes for a supported lang, via the same node-type
-    detection the header builders use above. Empty for languages with no
-    import concept (groovy) or an unrecognized lang."""
     if lang == "java":
         return [c for c in root.children if c.type == "import_declaration"]
     if lang == "kotlin":
@@ -620,10 +547,6 @@ def _import_nodes(root, lang):
 
 
 def import_line_ranges(content, lang):
-    """0-based half-open (start, end) line ranges of import statements for a
-    supported lang, or [] if unsupported/unparseable - callers (e.g. read's
-    imports=false) fall back to showing the file unchanged on an empty
-    result."""
     if lang is None:
         return []
     try:
@@ -635,9 +558,7 @@ def import_line_ranges(content, lang):
 
 
 def _markdown_digest(content):
-    """Markdown has no declarations to parse - its heading lines already form
-    a natural outline, so just keep lines starting with '#' (ATX headings).
-    No tree-sitter involved."""
+    # No declarations to parse - keep ATX heading lines as the outline.
     out = []
     text = content.decode("utf-8", "ignore")
     for i, line in enumerate(text.split("\n"), start=1):
@@ -654,11 +575,6 @@ def _markdown_digest(content):
 
 
 def build_digest(content, lang, file_path, hide_private=False):
-    """content: raw file bytes. lang: one of LANG_BY_EXT's values. hide_private
-    drops fields/methods that read as private (see _is_private) - callers
-    that want everything (e.g. the CLI) leave it False. Returns the digest
-    string, or None if this file isn't a good fit for deterministic
-    extraction (caller should fall back to the LLM path)."""
     if lang == "markdown":
         return _markdown_digest(content)
     spec = SPECS.get(lang)

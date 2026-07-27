@@ -1,6 +1,3 @@
-"""hide_private=True coverage for each of the four private_marker modes in
-specs.SPECS: keyword (java/csharp/kotlin/ts/js), underscore (python), pub
-(rust), capitalize (go)."""
 from structural_digest import build_digest
 from test_languages import (
     CSHARP_SRC,

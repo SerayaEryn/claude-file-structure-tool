@@ -1,8 +1,3 @@
-"""Coverage of build_digest for every language in specs.SPECS (plus markdown,
-which has no spec entry but is handled specially). Each case pairs a small
-source snippet with a set of substrings the digest must contain - line
-numbers included, so a regression in _walk/_extract_sig/header building
-shows up immediately."""
 import pytest
 
 from structural_digest import build_digest
