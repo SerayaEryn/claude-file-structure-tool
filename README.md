@@ -27,15 +27,19 @@ Paths matched by `.gitignore`/`.aiignore` are refused.
 
 ## Supported languages
 
-| Extension             | Language   |
-|-----------------------|------------|
-| `.java`               | Java       |
-| `.kt`, `.kts`         | Kotlin     |
-| `.py`                 | Python     |
-| `.ts`, `.mts`, `.cts` | TypeScript |
-| `.tsx`                | TSX        |
-| `.groovy`, `.gradle`  | Groovy     |
-| `.md`, `.markdown`    | Markdown   |
+| Extension                        | Language   |
+|----------------------------------|------------|
+| `.java`                          | Java       |
+| `.kt`, `.kts`                    | Kotlin     |
+| `.py`                            | Python     |
+| `.ts`, `.mts`, `.cts`            | TypeScript |
+| `.tsx`                           | TSX        |
+| `.js`, `.mjs`, `.cjs`, `.jsx`    | JavaScript |
+| `.cs`                            | C#         |
+| `.rs`                            | Rust       |
+| `.go`                            | Go         |
+| `.groovy`, `.gradle`             | Groovy     |
+| `.md`, `.markdown`               | Markdown   |
 
 ## License
 

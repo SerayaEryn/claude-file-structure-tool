@@ -1,0 +1,15 @@
+[project]
+name = "file-structure-tool"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+test = [
+    "pytest",
+    "tree-sitter",
+    "tree-sitter-language-pack",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

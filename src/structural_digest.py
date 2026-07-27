@@ -21,105 +21,7 @@ that happens to share an extension we don't otherwise expect).
 import re
 import sys
 
-LANG_BY_EXT = {
-    ".java": "java",
-    ".kt": "kotlin",
-    ".kts": "kotlin",
-    ".py": "python",
-    ".groovy": "groovy",
-    ".gradle": "groovy",
-    ".ts": "typescript",
-    ".mts": "typescript",
-    ".cts": "typescript",
-    ".tsx": "tsx",
-    ".md": "markdown",
-    ".markdown": "markdown",
-}
-
-# Node type names are best-effort against current tree-sitter grammars for
-# each language. If a name is wrong or a grammar changes, the affected
-# declarations are simply never matched - build_digest() then returns None
-# (no declarations found) and the caller falls back to the LLM path. Wrong
-# names degrade gracefully, they never crash the hook.
-SPECS = {
-    "java": {
-        "type_nodes": {
-            "class_declaration", "interface_declaration",
-            "enum_declaration", "record_declaration",
-            "annotation_type_declaration",
-        },
-        "func_nodes": {"method_declaration", "constructor_declaration"},
-        "field_nodes": {"field_declaration"},
-        "body_field": "body",
-        "comment_marker": "//",
-        "private_marker": "keyword",
-    },
-    "kotlin": {
-        "type_nodes": {
-            "class_declaration", "object_declaration", "companion_object",
-        },
-        "func_nodes": {"function_declaration"},
-        "field_nodes": {"property_declaration"},
-        # tree-sitter-language-pack's Kotlin grammar doesn't expose field
-        # names (child_by_field_name always misses) - find the body by
-        # node type instead.
-        "body_field": None,
-        "body_types": {"class_body", "function_body"},
-        "comment_marker": "//",
-        "private_marker": "keyword",
-    },
-    "python": {
-        "type_nodes": {"class_definition"},
-        "func_nodes": {"function_definition"},
-        "field_nodes": set(),
-        "body_field": "body",
-        "comment_marker": "#",
-        "private_marker": "underscore",
-    },
-    "groovy": {
-        # The bundled Decodetalkers grammar is a shallow Gradle-DSL grammar:
-        # no class/method/field declaration nodes. Every statement is a
-        # `command`; a command that owns a `block` child is a config block we
-        # recurse into, otherwise it's a leaf call. This yields a best-effort
-        # block outline rather than a Java-style type skeleton.
-        "type_nodes": {"command"},
-        "func_nodes": set(),
-        "field_nodes": set(),
-        "body_field": None,
-        "body_types": {"block"},
-        "header_via_brace_scan": True,
-        "comment_marker": "//",
-    },
-}
-
-_TYPESCRIPT_SPEC = {
-    "type_nodes": {
-        "class_declaration", "abstract_class_declaration",
-        "interface_declaration", "enum_declaration",
-        "type_alias_declaration", "internal_module", "module",
-    },
-    "func_nodes": {
-        "function_declaration", "function_signature",
-        "method_definition", "method_signature",
-        "abstract_method_signature",
-    },
-    "field_nodes": {"public_field_definition", "property_signature"},
-    "body_field": "body",
-    "comment_marker": "//",
-    # `export class Foo`/`export function f`/`declare module X` wrap the real
-    # declaration one level up - unwrap them in-place (same depth) rather
-    # than emitting the wrapper itself as a bare "export" line.
-    "unwrap_nodes": {"export_statement", "ambient_declaration"},
-    # Surface `const Foo = (...) => {...}` / `const f = function () {}` at
-    # module or class scope - ubiquitous in TS/React and otherwise invisible
-    # to the class/function/interface node model above.
-    "arrow_const": True,
-    "private_marker": "keyword",
-}
-# Same spec for both grammars - `tsx` is a JSX-aware superset of the plain
-# `typescript` grammar with identical node names for everything we look at.
-SPECS["typescript"] = _TYPESCRIPT_SPEC
-SPECS["tsx"] = _TYPESCRIPT_SPEC
+from specs import LANG_BY_EXT, SPECS
 
 MAX_SIG_LEN = 200
 MAX_DIGEST_LINES = 400
@@ -229,6 +131,20 @@ def _is_private(sig, spec):
         m = re.search(r"\bdef\s+(\w+)", sig)
         name = m.group(1) if m else ""
         return name.startswith("_") and not (name.startswith("__") and name.endswith("__"))
+    if marker == "pub":
+        # Rust: private unless explicitly `pub`/`pub(crate)`/etc. Only
+        # applied to func/field signatures (types are never gated), which
+        # always carry their own visibility_modifier text when present.
+        return re.search(r"\bpub\b", sig) is None
+    if marker == "capitalize":
+        # Go: exported iff the declared name's first letter is uppercase.
+        # Method/function sigs start with "func" (optionally followed by a
+        # receiver); field and interface-method sigs start directly with
+        # the identifier - try the func-shaped pattern first, else take the
+        # leading identifier.
+        m = re.match(r"func\s+(?:\([^)]*\)\s*)?(\w+)", sig) or re.match(r"(\w+)", sig)
+        name = m.group(1) if m else ""
+        return bool(name) and name[0].islower()
     return False
 
 
@@ -299,10 +215,12 @@ def _first_child_of_type(node, types):
 
 def _decl_names(node, content, lang):
     """Identifier(s) declared by a definition node - almost always one, but a
-    Java field_declaration can carry several comma-separated declarators
+    Java/C# field_declaration can carry several comma-separated declarators
     (e.g. 'int x, y;'). Kotlin's grammar exposes no field names at all (see
     SPECS["kotlin"]'s body_field comment), so its nodes are matched by child
-    type instead of child_by_field_name."""
+    type instead of child_by_field_name. Go and Rust also use the node type
+    `field_declaration` for struct fields, but unlike Java/C# expose a plain
+    single `name` field - they fall through to the generic case below."""
     if lang == "kotlin":
         if node.type == "property_declaration":
             decl = _first_child_of_type(node, {"variable_declaration"})
@@ -310,10 +228,22 @@ def _decl_names(node, content, lang):
         else:
             ident = _first_child_of_type(node, {"type_identifier", "simple_identifier"})
         return [_node_text(ident, content)] if ident is not None else []
-    if node.type == "field_declaration":  # Java only - TS field nodes carry a single "name" field
+    if node.type == "field_declaration" and lang == "java":
         return [
             _node_text(name, content)
             for d in node.children_by_field_name("declarator")
+            for name in [d.child_by_field_name("name")] if name is not None
+        ]
+    if node.type == "field_declaration" and lang == "csharp":
+        # C# wraps declarators one level down in a variable_declaration,
+        # with no "declarator" field name exposed anywhere - find the
+        # variable_declarator children by type instead.
+        var_decl = _first_child_of_type(node, {"variable_declaration"})
+        if var_decl is None:
+            return []
+        return [
+            _node_text(name, content)
+            for d in var_decl.children if d.type == "variable_declarator"
             for name in [d.child_by_field_name("name")] if name is not None
         ]
     named = node.child_by_field_name("name")
@@ -595,6 +525,65 @@ def _typescript_header(root, content):
     return f"imports: {_format_import_list(imports, notable, shorten=False)}"
 
 
+def _csharp_header(root, content):
+    ns, imports = None, []
+    for child in root.children:
+        if ns is None and child.type in ("namespace_declaration", "file_scoped_namespace_declaration"):
+            name = child.child_by_field_name("name")
+            ns = _node_text(name, content) if name is not None else None
+        elif child.type == "using_directive":
+            txt = " ".join(_node_text(child, content).split()).rstrip(";")
+            imports.append(txt[len("using "):].strip() if txt.startswith("using ") else txt)
+    notable = [i for i in imports if not i.startswith(("System", "static System"))]
+    return _format_header("namespace", ns, imports, notable)
+
+
+def _rust_use_decls(root):
+    return [c for c in root.children if c.type == "use_declaration"]
+
+
+def _rust_header(root, content):
+    imports = []
+    for node in _rust_use_decls(root):
+        txt = " ".join(_node_text(node, content).split()).rstrip(";")
+        imports.append(txt[len("use "):].strip() if txt.startswith("use ") else txt)
+    if not imports:
+        return None
+    notable = [i for i in imports if not re.match(r"(pub\s+)?use\s+(std|core|alloc)::", i)]
+    return f"imports: {_format_import_list(imports, notable, shorten=False)}"
+
+
+def _go_import_specs(root):
+    specs = []
+    for child in root.children:
+        if child.type != "import_declaration":
+            continue
+        for c in child.children:
+            if c.type == "import_spec":
+                specs.append(c)
+            elif c.type == "import_spec_list":
+                specs.extend(cc for cc in c.children if cc.type == "import_spec")
+    return specs
+
+
+def _go_header(root, content):
+    pkg = None
+    for child in root.children:
+        if child.type == "package_clause":
+            ident = _first_child_of_type(child, {"package_identifier"})
+            pkg = _node_text(ident, content) if ident is not None else None
+    imports = []
+    for spec in _go_import_specs(root):
+        path = spec.child_by_field_name("path")
+        if path is not None:
+            imports.append(_node_text(path, content).strip('"'))
+    # Stdlib import paths have no dot in their first segment (e.g. "fmt",
+    # "encoding/json"); third-party paths are domain-qualified
+    # ("github.com/foo/bar") - a dot there is the signal.
+    notable = [i for i in imports if "." in i.split("/")[0]]
+    return _format_header("package", pkg, imports, notable)
+
+
 _HEADER_BUILDERS = {
     "java": _java_header,
     "kotlin": _kotlin_header,
@@ -602,6 +591,10 @@ _HEADER_BUILDERS = {
     "groovy": _groovy_header,
     "typescript": _typescript_header,
     "tsx": _typescript_header,
+    "javascript": _typescript_header,
+    "csharp": _csharp_header,
+    "rust": _rust_header,
+    "go": _go_header,
 }
 
 
@@ -615,8 +608,14 @@ def _import_nodes(root, lang):
         return _kotlin_imports(root)
     if lang == "python":
         return [c for c in root.children if c.type in ("import_statement", "import_from_statement")]
-    if lang in ("typescript", "tsx"):
+    if lang in ("typescript", "tsx", "javascript"):
         return [c for c in root.children if c.type == "import_statement"]
+    if lang == "csharp":
+        return [c for c in root.children if c.type == "using_directive"]
+    if lang == "rust":
+        return _rust_use_decls(root)
+    if lang == "go":
+        return [c for c in root.children if c.type == "import_declaration"]
     return []
 
 
