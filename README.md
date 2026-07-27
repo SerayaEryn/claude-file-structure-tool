@@ -70,7 +70,7 @@ declarations collapse to `L{n}`) — feed it straight into a targeted
 ## Hook
 
 Installing the plugin also adds a `PreToolUse` guard on `Read`: when an
-`Explore` subagent tries to read a file over 100 lines in full, it's denied
+`Explore` subagent tries to read a file over 50 lines in full, it's denied
 and pointed at `file_structure` instead. A targeted `Read(offset, limit)` —
 the intended follow-up once `file_structure` gives a line span — is exempt.
 The main agent and all other subagent types are unaffected.

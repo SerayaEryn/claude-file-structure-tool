@@ -62,7 +62,7 @@ def main():
     except OSError:
         return _allow()
 
-    if count is None or count <= 100:
+    if count is None or count <= 50:
         return _allow()
 
     _deny(
