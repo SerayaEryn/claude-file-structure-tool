@@ -9,7 +9,7 @@ test = [
     "pytest>=8",
     "tree-sitter>=0.26",
     "tree-sitter-language-pack>=1.13",
-    "pathspec>=1.1",
+    "pathspec>=1.1.1",
 ]
 
 [tool.pytest.ini_options]
