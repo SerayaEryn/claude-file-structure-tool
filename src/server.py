@@ -44,19 +44,25 @@ def _digest_or_raw(path, hide_private=False):
 
 @mcp.tool()
 def file_structure(files: list[str], hide_private: bool = False) -> str:
-    """Print an exact structural skeleton for one or more source files:
-    package/imports, then every type/function/field declaration in source
-    order with its exact signature (sliced straight from the source, never
-    re-synthesized) and its real line number.
+    """Compact structural skeleton of one or more source files: imports plus every
+    type/function/field declaration with its exact signature and line number, sliced
+    verbatim from source.
 
-    Deterministic tree-sitter extraction - no LLM, no hallucination risk.
-    Falls back to raw file content when the extension isn't supported or no
-    declarations are found. Use this before opening a file to understand its
-    shape cheaply, instead of reading the whole file.
+    Reach for this FIRST, before Read, whenever you need a file's SHAPE rather than
+    its full contents:
+    - "where/what is X defined here" - locating a function/class/field to edit
+    - getting line numbers to aim a precise Read or Edit
+    - surveying a file's public API or overall layout
+    - scanning several files at once: pass many paths in ONE call
+
+    Fall back to Read only when you need the actual body of a specific declaration or
+    non-declaration content. Falls back to raw file text for unsupported extensions or
+    files with no declarations.
 
     Args:
-        files: One or more file paths to digest.
-        hide_private: When true, omit private/underscore-prefixed declarations.
+        files: One or more file paths. Batch related files into a single call.
+        hide_private: Omit private/underscore-prefixed declarations for a leaner
+            public-API view.
     """
     if isinstance(files, str):
         files = [files]
