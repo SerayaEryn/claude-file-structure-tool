@@ -1,12 +1,24 @@
 #!/usr/bin/env python3
 """PreToolUse hook: nudge Explore agents to file_structure before full reads.
 
-Blocks a Read of a >100-line file when called from an Explore subagent,
-unless the read is already targeted (offset/limit set). Fails open on
-anything unexpected — this must never break a legitimate Read.
+Blocks a Read of a >100-line file when called from an Explore subagent and
+the file has an extension file_structure can parse, unless the read is
+already targeted (offset/limit set). Fails open on anything unexpected —
+this must never break a legitimate Read.
 """
 import json
+import os
 import sys
+
+# file_structure only parses the languages in specs.LANG_BY_EXT; import the
+# canonical set so the guard never redirects a file the tool can't handle.
+# Fail open (empty set -> guard never denies) if the import can't be resolved.
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+    from specs import LANG_BY_EXT
+    _SUPPORTED_EXTS = frozenset(LANG_BY_EXT)
+except Exception:
+    _SUPPORTED_EXTS = frozenset()
 
 
 def _allow():
@@ -55,6 +67,10 @@ def main():
 
     file_path = tool_input.get("file_path")
     if not file_path:
+        return _allow()
+
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext not in _SUPPORTED_EXTS:
         return _allow()
 
     try:
