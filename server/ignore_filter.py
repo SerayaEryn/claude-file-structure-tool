@@ -4,8 +4,8 @@
 """Root-confined .gitignore/.aiignore matching, consolidated from the
 claude-local-offload explore_agent's paths.py/ignore.py/config.py.
 
-Only the pieces file_structure needs are kept here (IGNORE_DIRS/IGNORE_EXT,
-IgnoreMatcher, _find_repo_root, _is_ignored) - the source modules also carry
+Only the pieces file_structure needs are kept here (IgnoreMatcher,
+_find_repo_root, _is_ignored) - the source modules also carry
 LLM-connection settings and root-escape helpers that don't apply to this
 MCP server.
 """
@@ -13,19 +13,6 @@ import os
 from pathlib import Path
 
 from pathspec import GitIgnoreSpec
-
-# Directories/extensions never worth showing: VCS internals, build output,
-# dependency trees, compiled artifacts.
-IGNORE_DIRS = {
-    ".git", ".hg", ".svn", ".bzr", ".jj", ".sl", "node_modules", "build",
-    "bin", "dist", "target", "out", ".gradle", ".idea", ".vscode",
-    "__pycache__", ".venv", "venv", ".mypy_cache", ".pytest_cache",
-    ".ruff_cache", "vendor", ".next", "coverage", ".tox", ".cache",
-}
-IGNORE_EXT = {
-    ".class", ".jar", ".war", ".pyc", ".pyo", ".o", ".a", ".so", ".dylib",
-    ".dll", ".exe", ".bin", ".lock", ".log", ".map", ".min.js",
-}
 
 _IGNORE_FILENAMES = (".gitignore", ".aiignore")
 
@@ -104,21 +91,9 @@ def get_matcher(root):
     return matcher
 
 
-def _static_noise(rel_path_str):
-    """True if a root-relative path is under - or is itself - an ignored
-    directory, or has an ignored extension."""
-    p = Path(rel_path_str.rstrip("/"))
-    if any(part in IGNORE_DIRS for part in p.parts):
-        return True
-    return p.suffix in IGNORE_EXT
-
-
 def _is_noise(root, rel_path_str, is_dir=False):
-    """True if a root-relative path is noise - either the static build/VCS/
-    dependency list above, or excluded by a .gitignore/.aiignore anywhere in
-    its ancestor chain under root."""
-    if _static_noise(rel_path_str):
-        return True
+    """True if a root-relative path is excluded by a .gitignore/.aiignore
+    anywhere in its ancestor chain under root."""
     return get_matcher(root).is_ignored(rel_path_str, is_dir=is_dir)
 
 
