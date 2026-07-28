@@ -20,6 +20,16 @@ from mcp.server.fastmcp import FastMCP
 mcp = FastMCP("file-structure")
 
 
+def _display_path(path):
+    try:
+        rel = os.path.relpath(path)
+    except ValueError:  # e.g. different drive on Windows
+        return path
+    if rel.startswith(".."):
+        return path
+    return rel
+
+
 def _digest_or_raw(path, hide_private=False):
     try:
         with open(path, "rb") as f:
@@ -75,7 +85,7 @@ def file_structure(files: list[str], hide_private: bool = False) -> str:
 
     sections = []
     for path in files:
-        lines = [f"===== {path} ====="]
+        lines = [f"===== {_display_path(path)} ====="]
         if _is_ignored(path):
             lines.append(f"error: path is ignored (.gitignore/.aiignore): {path}")
         else:
