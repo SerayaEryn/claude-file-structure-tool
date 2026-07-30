@@ -1,10 +1,10 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = [
-#   "mcp>=1.28",
-#   "tree-sitter>=0.26",
-#   "tree-sitter-language-pack>=1.13",
-#   "pathspec>=1.1",
+#   "mcp>=2,<3",
+#   "tree-sitter>=0.26,<1",
+#   "tree-sitter-language-pack>=1.13,<2",
+#   "pathspec>=1.1,<2",
 # ]
 # ///
 import os
@@ -15,9 +15,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import structural_digest
 from ignore_filter import _is_ignored
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
-mcp = FastMCP("file-structure")
+mcp = MCPServer("file-structure")
 
 
 def _display_path(path):

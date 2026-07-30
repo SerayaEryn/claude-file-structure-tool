@@ -26,3 +26,9 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+      - name: MCP server smoke test
+        run: |
+          timeout 60 uv run --script src/server.py < /dev/null 2> stderr.log || true
+          cat stderr.log
+          if grep -q Traceback stderr.log; then exit 1; fi
