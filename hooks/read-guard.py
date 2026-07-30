@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
 """PreToolUse hook: nudge Explore agents to file_structure before full reads.
 
 Blocks a Read of a >100-line file when called from an Explore subagent and
