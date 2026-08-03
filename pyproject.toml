@@ -6,7 +6,7 @@ dependencies = []
 
 [dependency-groups]
 test = [
-    "pytest>=8",
+    "pytest>=9.1.1",
     "tree-sitter>=0.26",
     "tree-sitter-language-pack>=1.13",
     "pathspec>=1.1",
