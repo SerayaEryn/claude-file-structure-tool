@@ -1,28 +1,36 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
-# dependencies = []
+# dependencies = [
+#   "tree-sitter>=0.26,<1",
+#   "tree-sitter-language-pack>=1.13,<2",
+# ]
 # ///
-"""PreToolUse hook: nudge Explore agents to file_structure before full reads.
+"""PreToolUse hook: give Explore agents the file_structure skeleton instead of
+a full Read on large files.
 
-Blocks a Read of a >100-line file when called from an Explore subagent and
-the file has an extension file_structure can parse, unless the read is
-already targeted (offset/limit set). Fails open on anything unexpected —
-this must never break a legitimate Read.
+Blocks a Read of a >50-line file when called from an Explore subagent and the
+file has an extension file_structure can parse, unless the read is already
+targeted (offset/limit set). Instead of a bare denial, the block reason
+embeds the structural digest itself so no follow-up tool call is needed.
+Fails open on anything unexpected — this must never break a legitimate Read.
 """
 import json
 import os
 import sys
 
-# file_structure only parses the languages in specs.LANG_BY_EXT; import the
-# canonical set so the guard never redirects a file the tool can't handle.
-# Fail open (empty set -> guard never denies) if the import can't be resolved.
+# file_structure only parses the languages in structural_digest.LANG_BY_EXT;
+# import the canonical set and digest builder so the guard never redirects a
+# file the tool can't handle, and can build the same skeleton inline.
+# Fail open (empty set / no builder -> guard never denies) if the import
+# can't be resolved.
 try:
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-    from specs import LANG_BY_EXT
+    from structural_digest import LANG_BY_EXT, build_digest
     _SUPPORTED_EXTS = frozenset(LANG_BY_EXT)
 except Exception:
     _SUPPORTED_EXTS = frozenset()
+    build_digest = None
 
 
 def _allow():
@@ -40,20 +48,14 @@ def _deny(reason):
     sys.exit(0)
 
 
-def _line_count(path, limit=100):
-    """Count newlines up to limit + 1, streaming in chunks."""
-    count = 0
+def _read_and_count(path):
+    """Read the whole file, returning (data, line_count). line_count is None
+    for binary/special files."""
     with open(path, "rb") as f:
-        while True:
-            chunk = f.read(65536)
-            if not chunk:
-                break
-            if b"\x00" in chunk:
-                return None  # binary/special file, skip
-            count += chunk.count(b"\n")
-            if count > limit:
-                return count
-    return count
+        data = f.read()
+    if b"\x00" in data:
+        return data, None
+    return data, data.count(b"\n")
 
 
 def main():
@@ -78,15 +80,33 @@ def main():
         return _allow()
 
     try:
-        count = _line_count(file_path)
+        raw, count = _read_and_count(file_path)
     except OSError:
         return _allow()
 
     if count is None or count <= 50:
         return _allow()
 
+    digest = None
+    if build_digest is not None:
+        lang = LANG_BY_EXT.get(ext)
+        try:
+            digest = build_digest(raw, lang, file_path)
+        except Exception:
+            digest = None
+
+    if digest:
+        _deny(
+            f"Read blocked: Its structural "
+            "skeleton is below — you do not need to call file_structure for "
+            f"this file.\n\n{digest}\n\n"
+            'Read only the span you need: Read(file_path="'
+            f"{file_path}"
+            '", offset=<start>, limit=<end - start + 1>).'
+        )
+
     _deny(
-        f"{file_path} has {count}+ lines. Call the "
+        f"{file_path} has {count} lines. Call the "
         "file_structure tool "
         "(mcp__plugin_file-structure_file-structure__file_structure) first"
         ", then Read only "
