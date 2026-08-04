@@ -8,7 +8,7 @@ dependencies = []
 test = [
     "pytest>=8",
     "tree-sitter>=0.26",
-    "tree-sitter-language-pack>=1.13",
+    "tree-sitter-language-pack>=1.13.7",
     "pathspec>=1.1",
 ]
 
