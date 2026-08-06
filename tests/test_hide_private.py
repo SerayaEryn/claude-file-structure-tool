@@ -6,7 +6,9 @@ from test_languages import (
     JAVASCRIPT_SRC,
     KOTLIN_SRC,
     PYTHON_SRC,
+    RUBY_SRC,
     RUST_SRC,
+    SCALA_SRC,
     TYPESCRIPT_SRC,
 )
 
@@ -66,3 +68,18 @@ def test_go_hide_private_drops_lowercase_initial():
     assert "field: X int" in digest
     assert "L17-19: func (f *Foo) Bar() string" in digest
     assert "L21: func helper() int" not in digest
+
+
+def test_scala_hide_private_drops_private_val_keeps_public_def():
+    digest = build_digest(SCALA_SRC, "scala", "Foo.scala", hide_private=True)
+    assert "field: private val secret = 1" not in digest
+    assert "L15: def greet(name: String)" in digest
+
+
+def test_ruby_hide_private_is_a_no_op():
+    # Ruby's bare `private` keyword flips visibility for all subsequent defs
+    # rather than annotating each signature - hide_private can't be expressed
+    # for Ruby, so it's documented as a no-op (matches Groovy/Markdown).
+    with_private = build_digest(RUBY_SRC, "ruby", "foo.rb", hide_private=False)
+    without_private = build_digest(RUBY_SRC, "ruby", "foo.rb", hide_private=True)
+    assert with_private == without_private

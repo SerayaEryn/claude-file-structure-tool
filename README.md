@@ -33,7 +33,10 @@ separate setup needed.
 | `.cs`                            | C#         |
 | `.rs`                            | Rust       |
 | `.go`                            | Go         |
+| `.rb`, `.rake`                   | Ruby       |
+| `.scala`, `.sc`                  | Scala      |
 | `.groovy`, `.gradle`             | Groovy     |
+| `.tf`, `.hcl`                    | Terraform (block outline, like Groovy/Gradle) |
 | `.md`, `.markdown`               | Markdown   |
 
 ## Tool

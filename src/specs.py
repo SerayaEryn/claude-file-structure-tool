@@ -23,6 +23,12 @@ LANG_BY_EXT = {
     ".go": "go",
     ".md": "markdown",
     ".markdown": "markdown",
+    ".tf": "terraform",
+    ".hcl": "terraform",
+    ".scala": "scala",
+    ".sc": "scala",
+    ".rb": "ruby",
+    ".rake": "ruby",
 }
 
 SPECS = {
@@ -156,6 +162,52 @@ SPECS["rust"] = {
     "body_field": "body",
     "comment_marker": "//",
     "private_marker": "pub",
+}
+
+SPECS["terraform"] = {
+    # The grammar has no class/function nodes - a `block` is `resource "type"
+    # "name" { ... }` / `module "name" { ... }` / etc. Attributes inside a
+    # block are plain `attribute` nodes, deliberately left out of
+    # type_nodes/field_nodes since a single resource can carry dozens of them
+    # and they'd swamp a block-level outline.
+    "type_nodes": {"block"},
+    "func_nodes": set(),
+    "field_nodes": set(),
+    # A `block` exposes its inner container via a `body`-typed child, not a
+    # named field (verified against the bundled grammar) - matched by node
+    # type instead, same trick as Kotlin/Go. The top-level container the
+    # parser hands _walk is *also* type `body` (config_file -> body -> block
+    # ...), so it must be unwrapped in place to expose the top-level blocks.
+    "body_field": None,
+    "body_types": {"body"},
+    "unwrap_nodes": {"body"},
+    "comment_marker": "#",
+}
+
+SPECS["scala"] = {
+    "type_nodes": {
+        "class_definition", "object_definition", "trait_definition",
+        "enum_definition",
+    },
+    # Abstract methods (no body, e.g. in a trait) parse as
+    # function_declaration; concrete ones as function_definition.
+    "func_nodes": {"function_definition", "function_declaration"},
+    "field_nodes": {"val_definition", "var_definition"},
+    "body_field": "body",
+    "comment_marker": "//",
+    "private_marker": "keyword",
+}
+
+SPECS["ruby"] = {
+    "type_nodes": {"module", "class", "singleton_class"},
+    "func_nodes": {"method", "singleton_method"},
+    "field_nodes": set(),
+    "body_field": "body",
+    "comment_marker": "#",
+    # No private_marker: Ruby's bare `private` keyword flips visibility for
+    # all subsequent defs in a class rather than annotating each signature,
+    # so the sig-regex model _is_private() uses can't express it.
+    # hide_private is a no-op for Ruby, same as for Groovy/Markdown.
 }
 
 SPECS["go"] = {

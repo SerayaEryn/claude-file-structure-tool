@@ -156,6 +156,55 @@ dependencies {
 }
 """
 
+TERRAFORM_SRC = b"""resource "aws_instance" "web" {
+  ami           = "abc"
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = "web"
+  }
+}
+
+module "vpc" {
+  source = "./modules/vpc"
+}
+"""
+
+SCALA_SRC = b"""package com.example
+
+import scala.util.Try
+import com.example.util.Helper
+
+trait Greeter {
+  def greet(name: String): String
+}
+
+object Foo {
+  val z: Int = 0
+}
+
+case class Bar(a: Int) extends Greeter {
+  def greet(name: String) = "hi " + name
+  private val secret = 1
+}
+"""
+
+RUBY_SRC = b"""require 'json'
+require_relative './helper'
+
+module M
+  class Foo < Bar
+    def self.build
+      new
+    end
+
+    def bar(a)
+      a
+    end
+  end
+end
+"""
+
 MARKDOWN_SRC = b"""# Title
 
 Some text.
@@ -235,6 +284,27 @@ LANGUAGE_CASES = [
         "L17-19: func (f *Foo) Bar() string",
         "L21-23: func helper() int",
     ]),
+    ("terraform", TERRAFORM_SRC, [
+        'L1-8: resource "aws_instance" "web"',
+        'L10-12: module "vpc"',
+    ]),
+    ("scala", SCALA_SRC, [
+        "package com.example; imports: util.Helper",
+        "L6-8: trait Greeter",
+        "L7: def greet(name: String): String",
+        "L10-12: object Foo",
+        "L11: field: val z: Int = 0",
+        "L14-17: case class Bar(a: Int) extends Greeter",
+        "L15: def greet(name: String)",
+        "L16: field: private val secret = 1",
+    ]),
+    ("ruby", RUBY_SRC, [
+        "imports: json, ./helper",
+        "L4-14: module M",
+        "L5-13: class Foo < Bar",
+        "L6-8: def self.build",
+        "L10-12: def bar(a)",
+    ]),
     ("groovy", GROOVY_SRC, [
         "L1-5: plugins",
         "L2-3: id 'java'",
@@ -254,3 +324,16 @@ def test_build_digest_contains_expected_lines(lang, src, expected):
     assert digest is not None
     for substring in expected:
         assert substring in digest, f"missing {substring!r} in:\n{digest}"
+
+
+def test_terraform_block_header_is_collapsed_not_full_body():
+    # Regression guard: if the grammar's body-detection ever breaks, _extract_sig
+    # falls back to node.end_byte and emits the *entire block* (attributes
+    # included) as one line instead of just the header - a plain substring
+    # check wouldn't catch that since the short header is a prefix of the
+    # failure-mode output too.
+    digest = build_digest(TERRAFORM_SRC, "terraform", "test.tf")
+    lines = digest.split("\n")
+    assert 'L1-8: resource "aws_instance" "web"' in lines
+    assert "ami" not in digest
+    assert "instance_type" not in digest

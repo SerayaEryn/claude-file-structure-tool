@@ -213,6 +213,15 @@ def _decl_names(node, content, lang):
             for d in var_decl.children if d.type == "variable_declarator"
             for name in [d.child_by_field_name("name")] if name is not None
         ]
+    if node.type in ("val_definition", "var_definition") and lang == "scala":
+        # val/var declarations expose their bound name via a "pattern" field,
+        # not "name" - simple `val x = ...` binds through an identifier
+        # pattern directly.
+        pattern = node.child_by_field_name("pattern")
+        if pattern is None:
+            return []
+        ident = pattern if pattern.type == "identifier" else _first_child_of_type(pattern, {"identifier"})
+        return [_node_text(ident, content)] if ident is not None else []
     named = node.child_by_field_name("name")
     return [_node_text(named, content)] if named is not None else []
 
@@ -246,7 +255,7 @@ def _iter_decls(container, spec, lang, content):
 
 
 def find_declarations(content, lang, name):
-    if lang in ("markdown", "groovy"):
+    if lang in ("markdown", "groovy", "terraform"):
         return None
     spec = SPECS.get(lang)
     if spec is None:
@@ -434,6 +443,57 @@ def _groovy_header(root, content):
     return None
 
 
+def _terraform_header(root, content):
+    # No import/package concept - `resource`/`module`/`variable` blocks are
+    # ordinary top-level `block`s and already show up inline in the outline
+    # body, so there's nothing distinct to summarize here.
+    return None
+
+
+def _scala_header(root, content):
+    pkg = None
+    for child in root.children:
+        if child.type == "package_clause":
+            name = child.child_by_field_name("name")
+            pkg = _node_text(name, content) if name is not None else None
+    imports = []
+    for child in root.children:
+        if child.type == "import_declaration":
+            txt = " ".join(_node_text(child, content).split())
+            imports.append(txt[len("import "):].strip() if txt.startswith("import ") else txt)
+    notable = [i for i in imports if not i.startswith(("scala.", "java."))]
+    return _format_header("package", pkg, imports, notable)
+
+
+_RUBY_REQUIRE_METHODS = {"require", "require_relative"}
+
+
+def _ruby_require_calls(root, content):
+    out = []
+    for child in root.children:
+        if child.type != "call":
+            continue
+        method = child.child_by_field_name("method")
+        if method is None or _node_text(method, content) not in _RUBY_REQUIRE_METHODS:
+            continue
+        out.append(child)
+    return out
+
+
+def _ruby_header(root, content):
+    imports = []
+    for call in _ruby_require_calls(root, content):
+        args = call.child_by_field_name("arguments")
+        if args is None or not args.children:
+            continue
+        imports.append(_node_text(args.children[0], content).strip("'\""))
+    if not imports:
+        return None
+    # No reliable Ruby stdlib list to filter against - show everything as
+    # notable rather than silently hiding some.
+    return f"imports: {_format_import_list(imports, imports, shorten=False)}"
+
+
 NODE_BUILTINS = {
     "fs", "path", "os", "http", "https", "http2", "net", "url", "util",
     "crypto", "events", "stream", "child_process", "assert", "buffer",
@@ -534,10 +594,13 @@ _HEADER_BUILDERS = {
     "csharp": _csharp_header,
     "rust": _rust_header,
     "go": _go_header,
+    "terraform": _terraform_header,
+    "scala": _scala_header,
+    "ruby": _ruby_header,
 }
 
 
-def _import_nodes(root, lang):
+def _import_nodes(root, lang, content=None):
     if lang == "java":
         return [c for c in root.children if c.type == "import_declaration"]
     if lang == "kotlin":
@@ -552,6 +615,10 @@ def _import_nodes(root, lang):
         return _rust_use_decls(root)
     if lang == "go":
         return [c for c in root.children if c.type == "import_declaration"]
+    if lang == "scala":
+        return [c for c in root.children if c.type == "import_declaration"]
+    if lang == "ruby":
+        return _ruby_require_calls(root, content)
     return []
 
 
@@ -563,7 +630,7 @@ def import_line_ranges(content, lang):
     except Exception:
         return []
     root = parser.parse(content).root_node
-    return [(n.start_point[0], n.end_point[0] + 1) for n in _import_nodes(root, lang)]
+    return [(n.start_point[0], n.end_point[0] + 1) for n in _import_nodes(root, lang, content)]
 
 
 def _markdown_digest(content):
