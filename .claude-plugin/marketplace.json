@@ -8,7 +8,7 @@
       "name": "file-structure",
       "source": "./",
       "description": "Deterministic tree-sitter skeleton (imports + declarations with signatures and line numbers) for source files, exposed as an MCP tool.",
-      "version": "0.4.0"
+      "version": "0.5.0"
     }
   ]
 }
