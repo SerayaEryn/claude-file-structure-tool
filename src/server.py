@@ -63,6 +63,7 @@ def file_structure(files: list[str], hide_private: bool = False) -> str:
     - getting a line span to aim a precise Read or Edit
     - surveying a file's public API or overall layout
     - scanning several files at once: pass many paths in ONE call
+    - NEVER call this on a directory
 
     Each declaration is tagged `L{start}-{end}` (or `L{n}` when it's a single
     line) covering its full body, not just its header - feed that span straight
