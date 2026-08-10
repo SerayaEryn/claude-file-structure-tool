@@ -52,7 +52,7 @@ def _digest_or_raw(path, hide_private=False):
     return data.decode("utf-8", errors="ignore"), True
 
 
-@mcp.tool()
+@mcp.tool(structured_output=False)
 def file_structure(files: list[str], hide_private: bool = False) -> str:
     """Compact structural skeleton of one or more source files: imports plus every
     type/function/field declaration with its exact signature and line span, sliced
