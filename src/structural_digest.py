@@ -309,9 +309,12 @@ def _spock_label_text(node, content):
     label_node, splitter = children[0], children[1]
     if splitter.type != "arg_spliter":
         return None
-    if _node_text(label_node, content).strip() not in _SPOCK_LABELS:
+    label = _node_text(label_node, content).strip()
+    if label not in _SPOCK_LABELS:
         return None
-    return _collapse_sig(_node_text(node, content))
+    has_description = any(c.type != "\n" for c in children[2:])
+    text = _collapse_sig(_node_text(node, content)) if has_description else None
+    return label, text
 
 
 def _walk_groovy_class(container, spec, content, depth, in_method_body):
@@ -335,10 +338,12 @@ def _walk_groovy_class(container, spec, content, depth, in_method_body):
             out.extend(_walk_groovy_class(block, spec, content, depth + 1, not is_class))
             pending_where = False
         elif in_method_body:
-            label = _spock_label_text(child, content)
-            if label is not None:
-                out.append(f"{indent}{_lineref(child)}: {label}")
-                pending_where = label.startswith("where")
+            label_info = _spock_label_text(child, content)
+            if label_info is not None:
+                label, text = label_info
+                if text is not None:
+                    out.append(f"{indent}{_lineref(child)}: {text}")
+                pending_where = label == "where"
             elif pending_where:
                 sig = _collapse_sig(_node_text(child, content))
                 out.append(f"{indent}{_lineref(child)}: {sig}")
