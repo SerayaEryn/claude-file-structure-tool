@@ -70,6 +70,14 @@ Each declaration's `L{start}-{end}` span covers its full body (single-line
 declarations collapse to `L{n}`) — feed it straight into a targeted
 `Read(offset, limit)` instead of reading the whole file.
 
+## Hook
+
+Installing the plugin also adds a `PreToolUse` guard on `Read`: when an
+`Explore` subagent tries to read a file over 250 lines in full, it's denied
+and pointed at `file_structure` instead. A targeted `Read(offset, limit)` —
+the intended follow-up once `file_structure` gives a line span — is exempt.
+The main agent and all other subagent types are unaffected.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
